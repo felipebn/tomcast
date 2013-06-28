@@ -1,0 +1,57 @@
+#!/usr/bin/env ruby
+# encoding: UTF-8
+THIS_FILE = File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__
+$: << File.expand_path(File.dirname(THIS_FILE) )
+require 'rubygems'
+require 'gtk2'
+require 'gui'
+
+#tomcast app:
+tomcast = TomcastApp.new
+
+
+at_exit do 
+    tomcast.destroy
+end
+
+
+
+###**************************###
+## Displayed Icon
+###**************************###
+si=Gtk::StatusIcon.new
+si.pixbuf=Gdk::Pixbuf.new( File.dirname( THIS_FILE ) + '/tomcast.png')
+si.tooltip='Tomcast'
+
+
+
+###**************************###
+## Handle left click on icon
+###**************************###
+si.signal_connect('activate'){|| tomcast.display_window}
+
+
+###**************************###
+## Pop up menu on rigth click
+###**************************###
+##Build a menu
+info=Gtk::ImageMenuItem.new(Gtk::Stock::PREFERENCES)
+info.signal_connect('activate'){tomcast.display_window}
+quit=Gtk::ImageMenuItem.new(Gtk::Stock::QUIT)
+quit.signal_connect('activate'){ tomcast.destroy ; Gtk.main_quit }
+menu=Gtk::Menu.new
+menu.append(info)
+menu.append(Gtk::SeparatorMenuItem.new)
+menu.append(quit)
+menu.show_all
+##Show menu on rigth click
+si.signal_connect('popup-menu'){|tray, button, time| menu.popup(nil, nil, button, time)}
+
+###**************************###
+## Main loop
+###**************************###
+
+Gtk.timeout_add(100) do
+    tomcast.check_evt
+end
+Gtk.main

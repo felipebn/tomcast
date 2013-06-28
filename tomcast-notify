@@ -1,0 +1,90 @@
+#!/usr/bin/env ruby
+#vim: setf ruby
+THIS_FILE = File.symlink?(__FILE__) ? File.readlink(__FILE__) : __FILE__
+$: << File.expand_path(File.dirname(THIS_FILE) )
+require 'rubygems'
+require 'carrier'
+require 'json'
+
+#valida argumentos
+is_help = ARGV.first == "-h" || ARGV.first == "--help"
+if ARGV.length != 1 || is_help
+    puts "Argumentos inválidos" if !is_help
+    puts "Uso: #{File.basename(__FILE__)} <COD_EVENTO>"
+    exit
+end 
+
+
+evt = ARGV.first
+
+
+carrier = Tomcast::Carrier.new( "224.0.0.13" , 38987 )
+
+#pergunta sobre interessados
+carrier.send( "{\"PING\":\"%s\"}" %  evt )
+
+interessados = 0
+
+exec_ping = lambda{|msg,info|
+    begin
+        payload = JSON.parse( msg )
+        unless payload["ACK"].nil?
+            puts "[PING]Msg recebida" + msg
+            interessados += 1 if payload["ACK"] == evt
+        end
+    rescue
+        puts "msg não tratada"
+    end
+
+
+}
+
+wait_ping = true
+
+t = Thread.new(carrier){|c| c.listen( exec_ping , lambda{|| wait_ping })}
+
+sleep(4)
+wait_ping = false
+
+
+
+puts "Total de interessados: " + interessados.to_s
+
+
+#pergunta pelos votos
+carrier.send( "{\"ASK\":\"%s\"}" %  evt )
+
+vote_pro = 0
+
+exec_vote = lambda{|msg,info|
+    begin
+        payload = JSON.parse( msg )
+        unless payload["ANS"].nil?
+            puts "[VOTE]Msg recebida" + msg
+            if payload["ANS"] == evt && payload["VOTE"] == 1
+                vote_pro += 1
+            end
+        end
+    rescue
+        puts "msg não tratada"
+    end
+
+}
+
+wait_vote = true
+
+t = Thread.new(carrier){|c| c.listen( exec_vote , lambda{|| wait_vote })}
+
+sleep(12)
+wait_vote = false
+
+
+puts "Votos pro: " + vote_pro.to_s
+
+
+exit_code = (interessados - vote_pro) == 0 ? 0 : -1
+
+exit exit_code
+
+
+
